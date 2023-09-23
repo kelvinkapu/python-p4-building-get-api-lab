@@ -1,20 +1,74 @@
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import MetaData
-from sqlalchemy_serializer import SerializerMixin
+#!/usr/bin/env python3
 
-metadata = MetaData(naming_convention={
-    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
-})
+from flask import Flask, make_response, jsonify
+from flask_migrate import Migrate
 
-db = SQLAlchemy(metadata=metadata)
+from models import db, Bakery, BakedGood
 
-class Bakery(db.Model, SerializerMixin):
-    __tablename__ = 'bakeries'
+app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.json.compact = False
 
-    id = db.Column(db.Integer, primary_key=True)
+migrate = Migrate(app, db)
 
-class BakedGood(db.Model, SerializerMixin):
-    __tablename__ = 'baked_goods'
+db.init_app(app)
 
-    id = db.Column(db.Integer, primary_key=True)
+@app.route('/')
+def index():
+    return '<h1>Bakery GET API</h1>'
+
+@app.route('/bakeries')
+def bakeries():
+
+    bakeries = Bakery.query.all()
+    bakeries_serialized = [bakery.to_dict() for bakery in bakeries]
+
+    response = make_response(
+        jsonify(bakeries_serialized),
+        200
+    )
+    response.headers['Content-Type'] = 'application/json'
+    return response
+
+@app.route('/bakeries/<int:id>')
+def bakery_by_id(id):
+
+    bakery = Bakery.query.filter_by(id=id).first()
+    bakery_serialized = bakery.to_dict()
+
+    response = make_response(
+        jsonify(bakery_serialized),
+        200
+    )
+    response.headers['Content-Type'] = 'application/json'
+    return response
+
+@app.route('/baked_goods/by_price')
+def baked_goods_by_price():
+    baked_goods_by_price = BakedGood.query.order_by(BakedGood.price).all()
+    baked_goods_by_price_serialized = [
+        bg.to_dict() for bg in baked_goods_by_price
+    ]
     
+    response = make_response(
+        jsonify(baked_goods_by_price_serialized),
+        200
+    )
+    response.headers['Content-Type'] = 'application/json'
+    return response
+
+@app.route('/baked_goods/most_expensive')
+def most_expensive_baked_good():
+    most_expensive = BakedGood.query.order_by(BakedGood.price.desc()).limit(1).first()
+    most_expensive_serialized = most_expensive.to_dict()
+
+    response = make_response(
+        jsonify(most_expensive_serialized),
+        200
+    )
+    response.headers['Content-Type'] = 'application/json'
+    return response
+
+if __name__ == '__main__':
+    app.run(port=555, debug=True)
